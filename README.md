@@ -1,2 +1,1 @@
-# succulent
-JUCE utils
+# JUCE utils
