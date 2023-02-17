@@ -2,8 +2,8 @@
 // Created by tar on 23/11/22.
 //
 
-#ifndef JACKTRIP_TEENSY_MULTICHANNELAUDIOSOURCE_H
-#define JACKTRIP_TEENSY_MULTICHANNELAUDIOSOURCE_H
+#ifndef SUCCULENT_MULTICHANNELAUDIOSOURCE_H
+#define SUCCULENT_MULTICHANNELAUDIOSOURCE_H
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_events/juce_events.h>
@@ -59,4 +59,4 @@ private:
 };
 
 
-#endif //JACKTRIP_TEENSY_MULTICHANNELAUDIOSOURCE_H
+#endif //SUCCULENT_MULTICHANNELAUDIOSOURCE_H
