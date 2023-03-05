@@ -11,6 +11,12 @@
 
 using namespace juce;
 
+/**
+ * Hat tip: https://forum.juce.com/t/how-best-to-read-multi-mono-wave-files-into-a-single-audio-source
+ *
+ * Designed to handle monophonic sources. Provided with a multichannel file, it
+ * will read the first channel only.
+ */
 class MultiChannelAudioSource : public PositionableAudioSource, public ChangeBroadcaster {
 public:
     explicit MultiChannelAudioSource(uint maxNumSources);
