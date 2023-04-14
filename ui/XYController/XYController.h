@@ -9,7 +9,7 @@
 
 class XYController : public juce::Component {
 public:
-    explicit XYController(uint maxNumNodes = 0);
+    explicit XYController(int maxNumNodes = -1);
 
     void paint(juce::Graphics &g) override;
 
@@ -64,6 +64,9 @@ protected:
         static float clamp(float val, float min, float max);
     };
 
+public:
+    void addNode(Node::Value);
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (XYController)
 
@@ -82,7 +85,7 @@ private:
     std::unordered_map<uint, std::unique_ptr<XYController::Node>>::iterator
     removeNodeByIterator(std::unordered_map<uint, std::unique_ptr<XYController::Node>>::iterator it);
 
-    uint maxNodes;
+    int maxNodes;
 
     bool canAddNode();
 };

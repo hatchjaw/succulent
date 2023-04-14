@@ -5,7 +5,7 @@
 #include "XYController.h"
 
 
-XYController::XYController(uint maxNumNodes) : maxNodes(maxNumNodes) {}
+XYController::XYController(int maxNumNodes) : maxNodes(maxNumNodes) {}
 
 void XYController::paint(juce::Graphics &g) {
     Component::paint(g);
@@ -127,7 +127,12 @@ void XYController::removeNode(uint index) {
 }
 
 bool XYController::canAddNode() {
-    return maxNodes == 0 || nodes.size() < maxNodes;
+    return maxNodes < 0 || static_cast<int>(nodes.size()) < maxNodes;
+}
+
+void XYController::addNode(XYController::Node::Value normalisedValue) {
+    auto b{getBounds().toFloat()};
+    createNode({normalisedValue.x * b.getWidth(), (1.f - normalisedValue.y) * b.getHeight()});
 }
 
 XYController::Node::Node(Value val, uint idx) : index(idx), value(val) {}
