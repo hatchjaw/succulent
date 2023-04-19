@@ -4,6 +4,7 @@
 
 #include "XYController.h"
 
+using NodeMap = std::unordered_map<uint, std::unique_ptr<XYController::Node>>;
 
 XYController::XYController(int maxNumNodes) : maxNodes(maxNumNodes) {}
 
@@ -45,42 +46,29 @@ void XYController::mouseDown(const juce::MouseEvent &event) {
 void XYController::createNode(juce::Point<float> position) {
     // Normalise the position to get the value.
     auto bounds{getBounds().toFloat()};
-    Node::Value value{position.x / bounds.getWidth(), 1 - position.y / bounds.getHeight()};
+    juce::Point<float> value{position.x / bounds.getWidth(), 1 - position.y / bounds.getHeight()};
 
     auto key{getNextAvailableNodeID()};
     DBG("XYController: Adding node with ID " << juce::String(key));
-    nodes[key] = std::make_unique<Node>(value, key);
-    auto *node{nodes[key].get()};
+    auto it{nodes.insert(NodeMap::value_type(key, std::make_unique<Node>(*this, value, key)))};
+    auto node{it.first->second.get()};
+
     addAndMakeVisible(node);
     node->setBounds();
 
-    node->onMove = [this](Node *nodeBeingMoved) {
-        // Set node bounds here
-        nodeBeingMoved->setBounds();
-        // And do value change callback
-        if (onValueChange != nullptr) {
-            // This isn't nice.
-            for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-                if (it->second.get() == nodeBeingMoved) {
-                    onValueChange(it->first, {nodeBeingMoved->value.x, nodeBeingMoved->value.y});
-                    return;
-                }
-            }
-        }
-    };
-
-    node->onRemove = [this](Node *nodeToRemove) {
-        removeNode(nodeToRemove);
+    node->onValueChange = [this]() {
+        DBG("in node->onValueChange()");
     };
 
     if (onValueChange != nullptr) {
-        onValueChange(key, {node->value.x, node->value.y});
+        onValueChange(key, node->value);
     }
 
     if (onAddNode != nullptr) {
-        onAddNode(key);
+        onAddNode(*node);
     }
 
+    // Repaint just the area where the new node resides.
     repaint(node->getBounds());
 }
 
@@ -90,6 +78,7 @@ void XYController::normalisePosition(juce::Point<float> &position) {
 }
 
 void XYController::removeNode(Node *const node) {
+    // Silly. Maybe dispense with.
     for (auto it = nodes.begin(); it != nodes.end(); ++it) {
         if (it->second.get() == node) {
             removeNodeByIterator(it);
@@ -124,18 +113,25 @@ uint XYController::getNextAvailableNodeID() {
 
 void XYController::removeNode(uint index) {
     nodes.erase(index);
+    if (onRemoveNode != nullptr) {
+        DBG("XYController: Removing node with ID " << juce::String(index));
+        onRemoveNode(index);
+    }
 }
 
 bool XYController::canAddNode() {
     return maxNodes < 0 || static_cast<int>(nodes.size()) < maxNodes;
 }
 
-void XYController::addNode(XYController::Node::Value normalisedValue) {
+void XYController::addNode(juce::Point<float> normalisedValue) {
     auto b{getBounds().toFloat()};
     createNode({normalisedValue.x * b.getWidth(), (1.f - normalisedValue.y) * b.getHeight()});
 }
 
-XYController::Node::Node(Value val, uint idx) : index(idx), value(val) {}
+XYController::Node::Node(XYController &controller, juce::Point<float> val, uint idx) :
+        owner(controller),
+        index(idx),
+        value(val) {}
 
 void XYController::Node::paint(juce::Graphics &g) {
     auto colour{
@@ -156,10 +152,15 @@ void XYController::Node::mouseDown(const juce::MouseEvent &event) {
         m.addItem(1, "Remove node");
         // TODO: expose possibility of adding more menu items via a callback.
         m.showMenuAsync(juce::PopupMenu::Options(), [this, event](int result) {
-            if (result == 1 && onRemove != nullptr) {
-                onRemove(this);
+            if (result == 1) {
+                owner.removeNode(index); // Schedule removal?... Call onRemove()?
             }
         });
+    } else {
+        currentDrag.reset();
+
+        currentDrag = std::make_unique<ScopedDragNotification>(*this);
+//        mouseDrag(event);
     }
 }
 
@@ -173,14 +174,25 @@ void XYController::Node::mouseDrag(const juce::MouseEvent &event) {
         auto newVal{event.getEventRelativeTo(parent).position / parentBottomRight};
 
         // Set node value.
-        value.x = clamp(newVal.x, 0., 1.);
-        value.y = clamp(1 - newVal.y, 0., 1.);
-        if (onMove != nullptr) {
-            onMove(this);
+        setValueX(clamp(newVal.x, 0., 1.), juce::sendNotificationSync);
+        setValueY(clamp(1 - newVal.y, 0., 1.), juce::sendNotificationSync);
+
+        setBounds();
+
+        if (owner.onValueChange != nullptr) {
+            owner.onValueChange(index, value);
         }
     }
 }
 
+void XYController::Node::mouseUp(const juce::MouseEvent &) {
+//    if (sendChangeOnlyOnRelease && valueOnMouseDown != static_cast<double> (currentValue.getValue()))
+//        triggerChangeMessage(sendNotificationAsync);
+
+    currentDrag.reset();
+}
+
+// TODO: move to Utils
 float XYController::Node::clamp(float val, float min, float max) {
     if (val >= max) {
         val = max;
@@ -190,10 +202,124 @@ float XYController::Node::clamp(float val, float min, float max) {
     return val;
 }
 
+void XYController::Node::handleAsyncUpdate() {
+    cancelPendingUpdate();
+
+    Component::BailOutChecker checker(this);
+    listeners.callChecked(checker, [&](Node::Listener &l) {
+        l.nodeValueChanged(this);
+    });
+
+    if (checker.shouldBailOut())
+        return;
+
+    if (onValueChange != nullptr)
+        onValueChange();
+
+    if (checker.shouldBailOut())
+        return;
+
+    if (auto *handler = getAccessibilityHandler())
+        handler->notifyAccessibilityEvent(juce::AccessibilityEvent::valueChanged);
+}
+
 void XYController::Node::setBounds() {
-    auto bounds{getParentComponent()->getBounds()};
-    Component::setBounds(bounds.getWidth() * value.x - NODE_WIDTH / 2,
-                         (bounds.getHeight() - bounds.getHeight() * value.y) - NODE_WIDTH / 2,
-                         Node::NODE_WIDTH,
-                         Node::NODE_WIDTH);
+    auto bounds{getParentComponent()->getBounds().toFloat()};
+    Component::setBounds(
+            static_cast<int>(roundf(bounds.getWidth() * value.x - NODE_WIDTH_HALF)),
+            static_cast<int>(roundf((bounds.getHeight() - bounds.getHeight() * value.y) - NODE_WIDTH_HALF)),
+            NODE_WIDTH,
+            NODE_WIDTH
+    );
+}
+
+void XYController::Node::setValueX(float newValue, juce::NotificationType notification) {
+//    if (newValue != lastCurrentValue)
+//    {
+//        lastCurrentValue = newValue;
+//
+//        // Need to do this comparison because the Value will use equalsWithSameType to compare
+//        // the new and old values, so will generate unwanted change events if the type changes.
+//        // Cast to double before comparing, to prevent comparing as another type (e.g. String).
+//        if (static_cast<double> (currentValue.getValue()) != newValue)
+//            currentValue = newValue;
+//    }
+
+    value.x = newValue;
+
+//    owner.repaint();
+
+    triggerChangeMessage(notification);
+}
+
+void XYController::Node::triggerChangeMessage(juce::NotificationType notification) {
+    if (notification != juce::dontSendNotification) {
+        valueChanged();
+
+        if (notification == juce::sendNotificationSync)
+            handleAsyncUpdate();
+        else
+            triggerAsyncUpdate();
+    }
+}
+
+void XYController::Node::setValueY(float newValue, juce::NotificationType notification) {
+    value.y = newValue;
+
+//    owner.repaint();
+
+    triggerChangeMessage(notification);
+}
+
+void XYController::Node::addListener(XYController::Node::Listener *listener) {
+    listeners.add(listener);
+}
+
+void XYController::Node::removeListener(XYController::Node::Listener *listener) {
+    listeners.remove(listener);
+}
+
+juce::Point<float> XYController::Node::getValue() {
+    return value;
+}
+
+uint XYController::Node::getIndex() const {
+    return index;
+}
+
+void XYController::Node::sendDragStart() {
+//    startedDragging();
+
+    Component::BailOutChecker checker(this);
+    listeners.callChecked(checker, [&](XYController::Node::Listener &l) { l.nodeDragStarted(this); });
+
+    if (checker.shouldBailOut())
+        return;
+
+//    if (owner.onDragStart != nullptr)
+//        owner.onDragStart();
+}
+
+void XYController::Node::sendDragEnd() {
+//    stoppedDragging();
+//    nodeBeingDragged = -1;
+
+    Component::BailOutChecker checker(this);
+    listeners.callChecked(checker, [&](XYController::Node::Listener &l) { l.nodeDragEnded(this); });
+
+    if (checker.shouldBailOut())
+        return;
+
+//    if (owner.onDragEnd != nullptr)
+//        owner.onDragEnd();
+}
+
+XYController::Node::ScopedDragNotification::ScopedDragNotification(Node &n)
+        : nodeBeingDragged(n) {
+    nodeBeingDragged.sendDragStart();
+}
+
+XYController::Node::ScopedDragNotification::~ScopedDragNotification() {
+//    if (nodeBeingDragged.pimpl != nullptr)
+    nodeBeingDragged.sendDragEnd();
 }
