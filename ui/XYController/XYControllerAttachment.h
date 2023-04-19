@@ -7,7 +7,6 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "XYController.h"
-#include "../../apvts/MultiValueAttachedControlBase.h"
 
 class XYControllerNodeParameterAttachment : private XYController::Node::Listener {
 public:

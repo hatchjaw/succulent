@@ -120,7 +120,7 @@ public:
 
         void triggerChangeMessage(juce::NotificationType notification);
 
-        static constexpr float NODE_WIDTH{50.f}, NODE_WIDTH_HALF{NODE_WIDTH / 2.f};
+        static constexpr float NODE_WIDTH{44.f}, NODE_WIDTH_HALF{NODE_WIDTH / 2.f};
 
         XYController &owner;
         uint index{0};

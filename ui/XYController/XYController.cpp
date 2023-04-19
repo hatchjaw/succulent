@@ -135,7 +135,10 @@ XYController::Node::Node(XYController &controller, juce::Point<float> val, uint 
 
 void XYController::Node::paint(juce::Graphics &g) {
     auto colour{
-            juce::Colours::steelblue.withRotatedHue(static_cast<float>(index) * 1 / juce::MathConstants<float>::twoPi)};
+            juce::Colours::steelblue
+            .withRotatedHue(static_cast<float>(index) * 1 / juce::MathConstants<float>::twoPi)
+            .withSaturation(.4)
+    };
     g.setColour(colour);
     g.fillEllipse(getLocalBounds().toFloat());
     g.setColour(colour.darker(.25));
