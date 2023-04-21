@@ -49,7 +49,7 @@ void XYController::createNode(juce::Point<float> position) {
     juce::Point<float> value{position.x / bounds.getWidth(), 1 - position.y / bounds.getHeight()};
 
     auto key{getNextAvailableNodeID()};
-    DBG("XYController: Adding node with ID " << juce::String(key));
+//    DBG("XYController: Adding node with ID " << juce::String(key));
     auto it{nodes.insert(NodeMap::value_type(key, std::make_unique<Node>(*this, value, key)))};
     auto node{it.first->second.get()};
 
