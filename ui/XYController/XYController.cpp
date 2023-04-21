@@ -4,16 +4,16 @@
 
 #include "XYController.h"
 
-using NodeMap = std::unordered_map<uint, std::unique_ptr<XYController::Node>>;
-
 XYController::XYController(int maxNumNodes) : maxNodes(maxNumNodes) {}
 
 void XYController::paint(juce::Graphics &g) {
     Component::paint(g);
-    g.fillAll(juce::Colours::whitesmoke);
+//    g.fillAll(juce::Colours::whitesmoke);
 
-    g.setColour(juce::Colours::lightgrey);
-    g.drawRect(getLocalBounds(), 1);
+//    g.setColour(juce::Colours::lightgrey);
+//    g.drawRect(getLocalBounds(), 1);
+
+    g.fillAll(juce::Colour{0.f, 0.f, 0.f, .1f});
 
     // Nodes are automatically painted, as they are added as child components.
 }
@@ -56,10 +56,6 @@ void XYController::createNode(juce::Point<float> position) {
     addAndMakeVisible(node);
     node->setBounds();
 
-    node->onValueChange = [this]() {
-        DBG("in node->onValueChange()");
-    };
-
     if (onValueChange != nullptr) {
         onValueChange(key, node->value);
     }
@@ -94,8 +90,7 @@ void XYController::removeAllNodes() {
     }
 }
 
-std::unordered_map<uint, std::unique_ptr<XYController::Node>>::iterator
-XYController::removeNodeByIterator(std::unordered_map<uint, std::unique_ptr<XYController::Node>>::iterator it) {
+XYController::NodeMap::iterator XYController::removeNodeByIterator(XYController::NodeMap::iterator it) {
     auto index{it->first};
     it = nodes.erase(it);
     if (onRemoveNode != nullptr) {
@@ -136,8 +131,9 @@ XYController::Node::Node(XYController &controller, juce::Point<float> val, uint 
 void XYController::Node::paint(juce::Graphics &g) {
     auto colour{
             juce::Colours::steelblue
-            .withRotatedHue(static_cast<float>(index) * 1 / juce::MathConstants<float>::twoPi)
-            .withSaturation(.4)
+                    .withRotatedHue(static_cast<float>(index) * 1 / juce::MathConstants<float>::twoPi)
+                    .withSaturation(.5f)
+                    .withAlpha(.75f)
     };
     g.setColour(colour);
     g.fillEllipse(getLocalBounds().toFloat());

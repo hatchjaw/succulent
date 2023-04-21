@@ -8,10 +8,9 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /*
- * TODO: document, and allow creation of non-removable nodes.
+ * TODO: document, and allow creation of non-removable nodes. Adopt PIMPL idiom.
  */
 class XYController : public juce::Component {
-protected:
 public:
     explicit XYController(int maxNumNodes = -1);
 
@@ -132,7 +131,6 @@ public:
 
         juce::ListenerList<Listener> listeners;
 
-
         void sendDragStart();
 
         void sendDragEnd();
@@ -142,10 +140,12 @@ public:
 
     std::function<void(XYController::Node &)> onAddNode;
 
+    using NodeMap = std::unordered_map<uint, std::unique_ptr<XYController::Node>>;
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (XYController)
 
-    std::unordered_map<uint, std::unique_ptr<Node>> nodes;
+    NodeMap nodes;
 
     void createNode(juce::Point<float> value);
 
@@ -157,8 +157,7 @@ private:
 
     void removeAllNodes();
 
-    std::unordered_map<uint, std::unique_ptr<Node>>::iterator
-    removeNodeByIterator(std::unordered_map<uint, std::unique_ptr<Node>>::iterator it);
+    NodeMap::iterator removeNodeByIterator(NodeMap::iterator it);
 
     int maxNodes;
 
