@@ -110,7 +110,7 @@ public:
 
         void setBounds();
 
-        void valueChanged() {};
+        void valueChanged() {}
 
         uint getIndex() const;
 
